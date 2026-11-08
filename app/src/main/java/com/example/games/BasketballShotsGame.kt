@@ -46,6 +46,8 @@ class BasketballShotsGame : MiniGame {
     // Drag aim vectors per player
     private val dragStartMap = mutableMapOf<Int, Offset>()
     private val dragCurrentMap = mutableMapOf<Int, Offset>()
+    private val joystickAimMap = mutableMapOf<Int, Offset>()
+    private val particleSystem = com.example.engine.ParticleSystem()
 
     // AI timer
     private val aiShotTimers = mutableMapOf<Int, Float>()
@@ -92,6 +94,7 @@ class BasketballShotsGame : MiniGame {
         }
 
         val gravity = 980f * deltaSeconds
+        particleSystem.update(deltaSeconds, gravity = 300f)
 
         // AI shooting
         players.filter { it.isAi }.forEach { ai ->
@@ -121,6 +124,7 @@ class BasketballShotsGame : MiniGame {
                 ) {
                     ball.vx = -kotlin.math.abs(ball.vx) * 0.65f
                     ball.x = bbX - ball.radius
+                    particleSystem.emitSparks(bbX, ball.y, Color(0xFFFBBF24), count = 8)
                     soundAndHaptics?.playHit()
                 }
 
@@ -138,6 +142,8 @@ class BasketballShotsGame : MiniGame {
                 ) {
                     ball.hasScored = true
                     scores[ball.player.id] = (scores[ball.player.id] ?: 0) + 2
+                    particleSystem.emitConfetti(hoopPos.x, hoopPos.y, listOf(Color(0xFFEA580C), Color(0xFFFBBF24), Color.White))
+                    particleSystem.emitShockwave(hoopPos.x, hoopPos.y, Color(0xFFEA580C), maxRadius = 45f)
                     soundAndHaptics?.playScore()
                 }
 
@@ -191,6 +197,24 @@ class BasketballShotsGame : MiniGame {
         ball.y = bounds.height * 0.55f + (idx - (players.size - 1) / 2f) * spacing
     }
 
+    override fun onJoystick(playerId: Int, x: Float, y: Float) {
+        val ball = balls.find { it.player.id == playerId } ?: return
+        if (ball.isAirborne) return
+
+        val mag = sqrt(x * x + y * y)
+        if (mag > 0.15f) {
+            joystickAimMap[playerId] = Offset(-x, -y)
+        } else if (joystickAimMap.containsKey(playerId)) {
+            val aim = joystickAimMap.remove(playerId) ?: return
+            val shotSpeed = 640f
+            ball.vx = (aim.x * shotSpeed).coerceIn(200f, 680f)
+            ball.vy = (aim.y * shotSpeed).coerceIn(-720f, -250f)
+            ball.isAirborne = true
+            ball.hasScored = false
+            soundAndHaptics?.playTap()
+        }
+    }
+
     override fun onPointerDown(playerId: Int, position: Offset) {
         val ball = balls.find { it.player.id == playerId } ?: return
         if (!ball.isAirborne) {
@@ -234,6 +258,9 @@ class BasketballShotsGame : MiniGame {
             soundAndHaptics?.playTap()
         }
     }
+
+    override fun getPlayerScore(playerId: Int): Int = scores[playerId] ?: 0
+    override fun getRemainingSeconds(): Int? = matchTimer.toInt()
 
     override fun isGameOver(): Boolean = gameOver
 
@@ -336,6 +363,27 @@ class BasketballShotsGame : MiniGame {
             }
         }
 
+        // Draw Joystick Aim Trajectory
+        joystickAimMap.forEach { (pId, aim) ->
+            val ball = balls.find { it.player.id == pId } ?: return@forEach
+            var simX = ball.x
+            var simY = ball.y
+            var simVx = (aim.x * 640f).coerceIn(200f, 680f)
+            var simVy = (aim.y * 640f).coerceIn(-720f, -250f)
+            val dt = 0.04f
+
+            for (step in 0..14) {
+                simVy += 980f * dt
+                simX += simVx * dt
+                simY += simVy * dt
+                drawScope.drawCircle(
+                    color = ball.player.color.copy(alpha = (1f - step / 16f)),
+                    center = Offset(simX, simY),
+                    radius = 5f
+                )
+            }
+        }
+
         // Draw Balls
         balls.forEach { ball ->
             val center = Offset(ball.x, ball.y)
@@ -359,5 +407,7 @@ class BasketballShotsGame : MiniGame {
                 radius = ball.radius * 0.45f
             )
         }
+
+        particleSystem.draw(drawScope)
     }
 }

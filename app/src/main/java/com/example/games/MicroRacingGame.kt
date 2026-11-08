@@ -23,6 +23,7 @@ class MicroRacingGame : MiniGame {
     private var players: List<Player> = emptyList()
     private var bounds: Size = Size.Zero
     private var soundAndHaptics: SoundAndHaptics? = null
+    private val particleSystem = com.example.engine.ParticleSystem()
 
     class Car(
         val player: Player,
@@ -74,6 +75,7 @@ class MicroRacingGame : MiniGame {
     override fun reset() {
         cars.clear()
         finishOrder.clear()
+        particleSystem.clear()
         gameOver = false
 
         val startLine = checkpoints.firstOrNull() ?: Offset(bounds.width / 2f, bounds.height * 0.15f)
@@ -147,6 +149,7 @@ class MicroRacingGame : MiniGame {
                 car.angle = bounceAngle
                 car.x = cx + (nx / sqrt(outerDist)) * 0.98f
                 car.y = cy + (ny / sqrt(outerDist)) * 0.98f
+                particleSystem.emitSparks(car.x, car.y, Color(0xFFFBBF24), count = 10)
                 soundAndHaptics?.playHit()
             } else if (innerDist < 1.0f) {
                 // Hit inner barrier: bounce outwards
@@ -155,6 +158,7 @@ class MicroRacingGame : MiniGame {
                 car.angle = bounceAngle
                 car.x = cx + (nx / sqrt(innerDist)) * 1.02f
                 car.y = cy + (ny / sqrt(innerDist)) * 1.02f
+                particleSystem.emitSparks(car.x, car.y, Color(0xFFFBBF24), count = 10)
                 soundAndHaptics?.playHit()
             }
 
@@ -171,6 +175,7 @@ class MicroRacingGame : MiniGame {
                         if (car.lapsCompleted >= totalLaps) {
                             car.isFinished = true
                             finishOrder.add(car.player)
+                            particleSystem.emitConfetti(car.x, car.y, listOf(Color.Red, Color.Yellow, Color.Cyan, Color.Green))
                             if (finishOrder.size >= players.size || finishOrder.size == 1) {
                                 gameOver = true
                                 soundAndHaptics?.playVictory()
@@ -194,6 +199,17 @@ class MicroRacingGame : MiniGame {
         }
     }
 
+    override fun onJoystick(playerId: Int, x: Float, y: Float) {
+        val car = cars.find { it.player.id == playerId } ?: return
+        if (x != 0f || y != 0f) {
+            val targetAngle = atan2(y, x)
+            var diff = targetAngle - car.angle
+            while (diff < -Math.PI) diff += (2 * Math.PI).toFloat()
+            while (diff > Math.PI) diff -= (2 * Math.PI).toFloat()
+            car.angle += diff.coerceIn(-5.5f * 0.016f, 5.5f * 0.016f)
+        }
+    }
+
     override fun onPointerUp(playerId: Int) {
         val car = cars.find { it.player.id == playerId } ?: return
         car.isSteeringRight = false
@@ -207,6 +223,8 @@ class MicroRacingGame : MiniGame {
     }
 
     override fun onPointerMove(playerId: Int, position: Offset) {}
+
+    override fun getPlayerScore(playerId: Int): Int = cars.find { it.player.id == playerId }?.lapsCompleted ?: 0
 
     override fun isGameOver(): Boolean = gameOver
 
@@ -311,5 +329,7 @@ class MicroRacingGame : MiniGame {
                 radius = 3f
             )
         }
+
+        particleSystem.draw(drawScope)
     }
 }

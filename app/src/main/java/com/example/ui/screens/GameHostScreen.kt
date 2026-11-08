@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -89,6 +90,8 @@ fun GameHostScreen(
     var countdownValue by remember { mutableIntStateOf(3) }
     var isGameOver by remember { mutableStateOf(false) }
     var gameResult by remember { mutableStateOf<GameResult?>(null) }
+    var liveScores by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
+    var remainingSeconds by remember { mutableStateOf<Int?>(null) }
 
     // Canvas bounds
     var canvasSize by remember { mutableStateOf(Size.Zero) }
@@ -129,6 +132,8 @@ fun GameHostScreen(
                     if (lastTimeNanos != 0L) {
                         val deltaSeconds = ((frameNanos - lastTimeNanos) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
                         miniGame.update(deltaSeconds)
+                        liveScores = players.associate { it.id to miniGame.getPlayerScore(it.id) }
+                        remainingSeconds = miniGame.getRemainingSeconds()
 
                         if (miniGame.isGameOver()) {
                             isGameOver = true
@@ -220,21 +225,58 @@ fun GameHostScreen(
             miniGame.draw(this)
         }
 
-        // Multi-touch Overlay with Reference 3 Pods
+        // Multi-touch Overlay with Reference 3 Pods & Analog Joysticks
         if (!isCountdownActive && !isGameOver) {
-            val liveScores = remember(miniGame, isGameOver) {
-                players.associate { it.id to it.score }
-            }
             MultiTouchOverlay(
                 players = players,
                 scores = liveScores,
                 onPlayerTap = { pId ->
                     miniGame.onButtonTap(pId)
                 },
+                onJoystickMove = { pId, x, y ->
+                    miniGame.onJoystick(pId, x, y)
+                },
                 onExitClick = {
                     isPaused = true
                 }
             )
+
+            // Top and Bottom Match Time Capsule (matching Reference image_69fcaf87.png)
+            if (remainingSeconds != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 10.dp)
+                        .background(Color(0xFF141322), RoundedCornerShape(20.dp))
+                        .border(2.dp, Color.Black, RoundedCornerShape(20.dp))
+                        .padding(horizontal = 14.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "$remainingSeconds",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 10.dp)
+                        .background(Color(0xFF141322), RoundedCornerShape(20.dp))
+                        .border(2.dp, Color.Black, RoundedCornerShape(20.dp))
+                        .padding(horizontal = 14.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "$remainingSeconds",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
         }
 
         // Minimal Header Bar

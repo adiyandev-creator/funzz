@@ -23,6 +23,7 @@ class SpinnerBattleGame : MiniGame {
     private var players: List<Player> = emptyList()
     private var bounds: Size = Size.Zero
     private var soundAndHaptics: SoundAndHaptics? = null
+    private val particleSystem = com.example.engine.ParticleSystem()
 
     class Spinner(
         val player: Player,
@@ -54,6 +55,7 @@ class SpinnerBattleGame : MiniGame {
     override fun reset() {
         spinners.clear()
         eliminationOrder.clear()
+        particleSystem.clear()
         gameOver = false
 
         val angleStep = (2 * Math.PI / players.size).toFloat()
@@ -75,6 +77,8 @@ class SpinnerBattleGame : MiniGame {
 
     override fun update(deltaSeconds: Float) {
         if (gameOver) return
+
+        particleSystem.update(deltaSeconds, gravity = 180f)
 
         val aliveSpinners = spinners.filter { it.isAlive }
         if (aliveSpinners.size <= 1 && players.size > 1) {
@@ -147,6 +151,8 @@ class SpinnerBattleGame : MiniGame {
             if (distCenter > arenaRadius + spinner.radius) {
                 spinner.isAlive = false
                 eliminationOrder.add(spinner.player)
+                particleSystem.emitSparks(spinner.x, spinner.y, spinner.player.color, count = 22)
+                particleSystem.emitShockwave(spinner.x, spinner.y, Color(0xFFEF4444), maxRadius = 55f)
                 soundAndHaptics?.playHit()
             }
         }
@@ -191,9 +197,22 @@ class SpinnerBattleGame : MiniGame {
                     s2.vx += nx * knockImpulse
                     s2.vy += ny * knockImpulse
 
+                    val hitX = (s1.x + s2.x) / 2f
+                    val hitY = (s1.y + s2.y) / 2f
+                    particleSystem.emitSparks(hitX, hitY, Color(0xFFFBBF24), count = 16)
+                    particleSystem.emitShockwave(hitX, hitY, Color.White, maxRadius = 36f)
+
                     soundAndHaptics?.playHit()
                 }
             }
+        }
+    }
+
+    override fun onJoystick(playerId: Int, x: Float, y: Float) {
+        val spinner = spinners.find { it.player.id == playerId && it.isAlive } ?: return
+        if (x != 0f || y != 0f) {
+            spinner.vx += x * 38f
+            spinner.vy += y * 38f
         }
     }
 
@@ -224,6 +243,9 @@ class SpinnerBattleGame : MiniGame {
         spinner.vy += sin(angle) * 240f
         soundAndHaptics?.playTap()
     }
+
+    override fun getPlayerScore(playerId: Int): Int =
+        if (spinners.find { it.player.id == playerId }?.isAlive == true) 1 else 0
 
     override fun isGameOver(): Boolean = gameOver
 
@@ -336,5 +358,7 @@ class SpinnerBattleGame : MiniGame {
                 radius = rad * 0.16f
             )
         }
+
+        particleSystem.draw(drawScope)
     }
 }

@@ -4,7 +4,10 @@ import androidx.compose.ui.geometry.Size
 import com.example.data.model.GameRegistry
 import com.example.data.model.Player
 import com.example.games.GameFactory
+import com.example.games.MemoryMatchGame
+import com.example.games.PaintArenaGame
 import com.example.games.TicTacToeGame
+import com.example.games.TugOfWarGame
 import com.example.ui.theme.PlayerPalette
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -71,5 +74,62 @@ class ExampleUnitTest {
         assertEquals(1, game.board[2])
         assertTrue("Game should be over on row complete", game.isGameOver())
         assertEquals(0, game.winnerPlayerIndex)
+        assertEquals(1, game.getPlayerScore(0))
+        assertEquals(0, game.getPlayerScore(1))
+    }
+
+    @Test
+    fun testTugOfWarPullsAndJoystick() {
+        val game = TugOfWarGame()
+        val players = listOf(
+            Player(0, "P1", PlayerPalette.player1),
+            Player(1, "P2", PlayerPalette.player2)
+        )
+        game.init(players, Size(400f, 600f), null)
+
+        val initialPos = game.ropePosition
+        // P0 (Team 1) pulls
+        game.onPlayerPull(0)
+        game.update(0.1f)
+        assertTrue("Rope should move to left (negative) when P0 pulls", game.ropePosition < initialPos)
+
+        // P1 pulls
+        val beforeP1 = game.ropePosition
+        for (i in 1..4) {
+            game.onPlayerPull(1)
+        }
+        game.update(0.1f)
+        assertTrue("Rope should pull towards right after multiple P1 pulls", game.ropePosition > beforeP1)
+    }
+
+    @Test
+    fun testPaintArenaScoresAndTimer() {
+        val game = PaintArenaGame()
+        val players = listOf(
+            Player(0, "P1", PlayerPalette.player1),
+            Player(1, "P2", PlayerPalette.player2)
+        )
+        game.init(players, Size(400f, 700f), null)
+        assertNotNull(game.getRemainingSeconds())
+        assertTrue("Match timer should be positive", game.getRemainingSeconds()!! > 0)
+
+        // Steer with joystick
+        game.onJoystick(0, 1.0f, 0.0f)
+        game.update(0.1f)
+        assertTrue("Paint Arena player 0 should have score", game.getPlayerScore(0) >= 0)
+    }
+
+    @Test
+    fun testMemoryMatchFlips() {
+        val game = MemoryMatchGame()
+        val players = listOf(
+            Player(0, "P1", PlayerPalette.player1),
+            Player(1, "P2", PlayerPalette.player2)
+        )
+        game.init(players, Size(400f, 600f), null)
+        assertEquals(16, game.cards.size)
+
+        game.flipCard(0)
+        assertTrue("Card 0 should be face up after flip", game.cards[0].isFaceUp)
     }
 }

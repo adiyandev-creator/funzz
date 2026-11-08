@@ -17,6 +17,9 @@ interface MiniGame {
     fun onPointerMove(playerId: Int, position: Offset)
     fun onPointerUp(playerId: Int)
     fun onButtonTap(playerId: Int)
+    fun onJoystick(playerId: Int, x: Float, y: Float) {}
+    fun getPlayerScore(playerId: Int): Int = 0
+    fun getRemainingSeconds(): Int? = null
     fun isGameOver(): Boolean
     fun getResults(): GameResult
     fun reset()

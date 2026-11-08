@@ -9,6 +9,7 @@ import com.example.data.model.Player
 import com.example.data.model.PlayerResult
 import com.example.engine.MiniGame
 import com.example.engine.SoundAndHaptics
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 class ReactionBattleGame : MiniGame {
@@ -18,6 +19,7 @@ class ReactionBattleGame : MiniGame {
     private var players: List<Player> = emptyList()
     private var bounds: Size = Size.Zero
     private var soundAndHaptics: SoundAndHaptics? = null
+    private val particleSystem = com.example.engine.ParticleSystem()
 
     enum class RoundState {
         WAITING,
@@ -76,12 +78,15 @@ class ReactionBattleGame : MiniGame {
     override fun update(deltaSeconds: Float) {
         if (gameOver) return
 
+        particleSystem.update(deltaSeconds, gravity = 0f)
+
         when (roundState) {
             RoundState.WAITING -> {
                 delayTimer += deltaSeconds
                 if (delayTimer >= targetDelay) {
                     roundState = RoundState.SIGNAL_ACTIVE
                     signalStartTime = System.currentTimeMillis()
+                    particleSystem.emitShockwave(bounds.width / 2f, bounds.height / 2f, Color(0xFF10B981), maxRadius = 160f)
                     soundAndHaptics?.playScore()
                 }
             }
@@ -118,6 +123,8 @@ class ReactionBattleGame : MiniGame {
                 // False start!
                 if (!falseStarts.contains(playerId)) {
                     falseStarts.add(playerId)
+                    val pColor = players.find { it.id == playerId }?.color ?: Color.Red
+                    particleSystem.emitSparks(bounds.width / 2f, bounds.height / 2f, pColor, count = 10)
                     soundAndHaptics?.playHit()
                     // If all remaining players false started, reset round
                     if (falseStarts.size >= players.size) {
@@ -136,9 +143,18 @@ class ReactionBattleGame : MiniGame {
                     roundWinnerId = playerId
                     scores[playerId] = (scores[playerId] ?: 0) + 1
                     roundState = RoundState.ROUND_OVER
+                    val pColor = players.find { it.id == playerId }?.color ?: Color(0xFF10B981)
+                    particleSystem.emitConfetti(bounds.width / 2f, bounds.height / 2f, listOf(pColor, Color.White, Color.Yellow), count = 28)
+                    particleSystem.emitShockwave(bounds.width / 2f, bounds.height / 2f, pColor, maxRadius = 140f)
                 }
             }
             RoundState.ROUND_OVER -> {}
+        }
+    }
+
+    override fun onJoystick(playerId: Int, x: Float, y: Float) {
+        if (sqrt(x * x + y * y) > 0.35f) {
+            onPlayerTap(playerId)
         }
     }
 
@@ -152,6 +168,8 @@ class ReactionBattleGame : MiniGame {
 
     override fun onPointerMove(playerId: Int, position: Offset) {}
     override fun onPointerUp(playerId: Int) {}
+
+    override fun getPlayerScore(playerId: Int): Int = scores[playerId] ?: 0
 
     override fun isGameOver(): Boolean = gameOver
 
@@ -204,5 +222,7 @@ class ReactionBattleGame : MiniGame {
             center = Offset(center.x - orbRadius * 0.25f, center.y - orbRadius * 0.25f),
             radius = orbRadius * 0.35f
         )
+
+        particleSystem.draw(drawScope)
     }
 }
