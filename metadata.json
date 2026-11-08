@@ -1,0 +1,6 @@
+{
+  "name": "PartyGrid",
+  "description": "A minimalist local multiplayer mini-game arcade for 1 to 4 players on a single device.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
